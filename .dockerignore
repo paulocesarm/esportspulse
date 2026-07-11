@@ -1,0 +1,12 @@
+# Não copiar para a imagem: segredos, dados e lixo local.
+# (O .env real chega pelas Environment Variables do Coolify, não pela imagem.)
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+datalake/
+.git/
+.DS_Store
+docs/
+*.md
