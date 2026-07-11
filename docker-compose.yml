@@ -1,0 +1,55 @@
+# docker-compose.yml — o produto inteiro do grupo em 2 containers + 1 volume.
+#
+#   [ingestor]  roda o scheduler perene   → ESCREVE em /app/datalake   (sem porta)
+#   [web]       roda o dashboard Streamlit → LÊ    de /app/datalake     (porta 8501)
+#   volume "datalake" → compartilhado pelos dois, PERSISTE entre redeploys.
+#
+# Deploy: no Coolify, "New Resource → Docker Compose", aponte para o repositório,
+# preencha YOUTUBE_API_KEY em Environment Variables e defina o domínio no serviço "web".
+# Ver deploy/README_DEPLOY_COOLIFY.md.
+
+services:
+  ingestor:
+    build: .
+    # Entrypoint canônico do template (§4 — agendamento perene com APScheduler).
+    # Se no seu repo o módulo tiver outro nome, ajuste só esta linha.
+    command: python -m ingestor.scheduler
+    env_file:
+      # Opcional: local você usa um .env; no Coolify a YOUTUBE_API_KEY vem das Env Vars
+      # do painel (aí o arquivo não existe — por isso "required: false", senão quebra).
+      - path: .env
+        required: false
+    volumes:
+      - datalake:/app/datalake
+    restart: always   # perenidade: se cair, sobe de novo sozinho (§6).
+
+  web:
+    build: .
+    command: >
+      streamlit run app/streamlit_app.py
+      --server.port 8501
+      --server.address 0.0.0.0
+      --server.headless true
+    environment:
+      # Aponta o dashboard para o MESMO datalake que o ingestor escreve.
+      DATALAKE_DIR: /app/datalake
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - datalake:/app/datalake
+    expose:
+      - "8501"        # o Traefik do Coolify publica esta porta no seu subdomínio (HTTPS automático).
+    depends_on:
+      - ingestor
+    restart: always
+    healthcheck:
+      # Streamlit expõe um endpoint de saúde; o Coolify usa isto para marcar up/down.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  datalake:            # volume nomeado: os dados vivem FORA do container.
