@@ -1,0 +1,14 @@
+# Segredos — NUNCA versionar (§7.1)
+.env
+
+# Ambiente virtual
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Dados gerados em runtime — não versionar (§4 / §7.1)
+datalake/
+
+# Sistema
+.DS_Store

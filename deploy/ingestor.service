@@ -1,0 +1,25 @@
+# systemd unit — INGESTOR perene (§4.1 agendamento, §6 observação)
+# Instalar na VPS:
+#   sudo cp deploy/ingestor.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now ingestor
+#   journalctl -u ingestor -f
+#
+# AJUSTE os campos marcados com <...> ao seu servidor.
+[Unit]
+Description=Ingestor perene (YouTube -> lakehouse) — trabalho final
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=<usuario_da_vps>
+WorkingDirectory=<caminho_absoluto_do_repositorio>
+EnvironmentFile=<caminho_absoluto_do_repositorio>/.env
+ExecStart=<caminho_absoluto_do_repositorio>/.venv/bin/python -m ingestor.scheduler
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

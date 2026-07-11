@@ -1,0 +1,28 @@
+# Unit do systemd para rodar a ingestao perene como servico na VPS.
+#
+# Instalacao (uma vez):
+#   sudo cp scripts/ingestor.service /etc/systemd/system/ingestor.service
+#   # ajuste WorkingDirectory/ExecStart/User conforme onde voce clonou o projeto
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ingestor
+#   journalctl -u ingestor -f          # acompanhar os logs em tempo real
+
+[Unit]
+Description=YouTube Ingestor Perene
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Pasta que CONTEM o pacote youtube_ingestor/ (a raiz do projeto):
+WorkingDirectory=/opt/youtube_ingestor
+ExecStart=/usr/bin/python3 -m youtube_ingestor.scheduler
+EnvironmentFile=/opt/youtube_ingestor/.env
+Restart=always
+RestartSec=10
+# Boa pratica: rodar com usuario sem privilegios, nao root.
+User=ingestor
+Group=ingestor
+
+[Install]
+WantedBy=multi-user.target

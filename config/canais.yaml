@@ -1,0 +1,74 @@
+# =============================================================================
+# Configuracao declarativa — EsportsPulse
+#
+# IDs verificados via resolver_handle.py em 2026-07-09.
+#
+# DIFERENCA em relacao ao modelo didatico:
+#   Nao ha campo "vocabulario" aqui. Os termos analiticos estao em
+#   sinais.yaml e sao compartilhados por todos os canais — o objetivo
+#   eh detectar eventos (clutch, virada, polemica...) que se aplicam
+#   igualmente a qualquer ORG de esports.
+#
+# Como descobrir um novo channel_id:
+#   python -m ingestor.scripts.resolver_handle @handle
+# =============================================================================
+
+canais:
+
+  - nome: "FURIA eSports"
+    channel_id: "UCT1F3iuRk0j7owMzNC09q1w"   # @FURIAgg
+    dominio: "cs2"
+    game: "cs2"
+    duracao_min_seg: 300        # ignora shorts e clips (< 5 min)
+    intervalo_min: 60
+    max_videos_por_ciclo: 5
+    ativo: true
+
+  - nome: "LOUD"
+    channel_id: "UC7iwNp4GUynlGXvK-6KD0Rw"   # @loudgg
+    dominio: "valorant"
+    game: "valorant"
+    duracao_min_seg: 300
+    intervalo_min: 60
+    max_videos_por_ciclo: 5
+    ativo: true
+
+  - nome: "paiN Gaming"
+    channel_id: "UC0jnW-v_1IanHuj2y3Z1AGA"   # @paingamingbr
+    dominio: "lol"
+    game: "lol"
+    duracao_min_seg: 300
+    intervalo_min: 60
+    max_videos_por_ciclo: 5
+    ativo: true
+
+  # - nome: "MIBR"
+  #   channel_id: "UCE30pLfsQQWijIN0RYFoESA"   # @mibr
+  #   dominio: "cs2"
+  #   game: "cs2"
+  #   intervalo_min: 30
+  #   max_videos_por_ciclo: 6
+  #   ativo: false
+
+  # - nome: "Fluxo"
+  #   channel_id: "UCUSKHWPgQl1ixaal1vysMyw"   # @Fluxo_Esports
+  #   dominio: "freefire"
+  #   game: "freefire"
+  #   intervalo_min: 60
+  #   max_videos_por_ciclo: 6
+  #   ativo: false
+
+
+# Parametros globais
+global:
+  idiomas_legenda: ["pt", "pt-BR", "en"]
+  # Modo demo: gera dados sinteticos deterministicos com termos de esports.
+  # Permite rodar e apresentar o pipeline sem API key e sem gastar cota.
+  modo_demo: false
+  # Incremental: janela usada nos ciclos seguintes (apos watermark estabelecido).
+  janela_descoberta_dias: 90
+  # Pausa entre chamadas de transcricao (youtube_transcript_api), em segundos.
+  # Evita rajada de requisicoes que leva a IpBlocked — sobretudo relevante em
+  # rede compartilhada (ex.: laboratorio/sala de aula com varios alunos no
+  # mesmo IP publico batendo na mesma API ao mesmo tempo).
+  transcript_delay_seg: 2

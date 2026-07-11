@@ -1,0 +1,32 @@
+# =============================================================================
+# Sinais de RESULTADO DE JOGO em fala casual — nao jargao de narracao/transmissao.
+#
+# Os canais das orgs (FURIA/LOUD/paiN) sao majoritariamente VLOGS de bastidor/
+# dia a dia: jogadores conversando sobre aleatoriedades, se preparando,
+# brincando, e SO EM UM PONTO ESPECIFICO (ou as vezes nem isso) comentam o
+# resultado da partida. Por isso o vocabulario aqui e sobre como alguem
+# comentaria o RESULTADO casualmente ("ganhamos", "perdemos"), nao termos de
+# transmissao ao vivo ("clutch", "ace", "virada" — ninguem fala isso
+# conversando, so o narrador durante o jogo).
+#
+# Usado por pipeline._carregar_sinais() como fallback quando o canal, em
+# canais.yaml, nao define um "vocabulario" proprio.
+# =============================================================================
+
+resultado_positivo:
+  - ganhamos
+  - vencemos
+  - venceu
+  - vitoria
+  - campeao
+  - campeas
+  - classificamos
+  - conseguimos
+
+resultado_negativo:
+  - perdemos
+  - perdeu
+  - derrota
+  - eliminados
+  - eliminado
+  - eliminacao
