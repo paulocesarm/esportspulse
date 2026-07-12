@@ -71,6 +71,47 @@ class YouTubeDiscovery:
             raise ValueError(f"Canal nao encontrado: {channel_id}")
         return items[0]["contentDetails"]["relatedPlaylists"]["uploads"]
 
+    def estatisticas_canal(self, channel_id: str) -> dict:
+        """Estatisticas PUBLICAS do canal (inscritos, views totais, qtd de
+        videos) -- base da analise cross-org. Nao exige OAuth do dono do
+        canal (diferente de audience retention/watch time, que e privado)."""
+        resp = self._client().channels().list(
+            part="snippet,statistics", id=channel_id).execute()
+        items = resp.get("items", [])
+        if not items:
+            return {"nome": "", "subscriber_count": 0, "total_view_count": 0,
+                    "video_count": 0}
+        sn, st = items[0]["snippet"], items[0].get("statistics", {})
+        return {
+            "nome": sn.get("title", ""),
+            "subscriber_count": int(st.get("subscriberCount", 0)),
+            "total_view_count": int(st.get("viewCount", 0)),
+            "video_count": int(st.get("videoCount", 0)),
+        }
+
+    def comentarios_video(self, video_id: str, max_results: int = 100) -> list[dict]:
+        """Top N comentarios (por relevancia) de um video -- base da nuvem de
+        palavras. So 1a pagina (sem paginacao): suficiente pra uma amostra
+        representativa, e mantem o custo de cota desprezivel (1 unidade/
+        video). Video com comentarios desabilitados (ou qualquer outro erro,
+        ex. video removido) so retorna vazio -- nao deve derrubar o ciclo
+        de ingestao, que depende da transcricao, nao do comentario."""
+        try:
+            resp = self._client().commentThreads().list(
+                part="snippet", videoId=video_id, maxResults=max_results,
+                order="relevance", textFormat="plainText").execute()
+        except Exception:
+            return []
+        out = []
+        for it in resp.get("items", []):
+            sn = it["snippet"]["topLevelComment"]["snippet"]
+            out.append({
+                "comentario_id": it["snippet"]["topLevelComment"]["id"],
+                "texto": sn.get("textOriginal", ""),
+                "like_count": int(sn.get("likeCount", 0)),
+            })
+        return out
+
     # trava de seguranca: no maximo N paginas de 50 (~500 candidatos) por
     # chamada, mesmo que duracao_min_seg exija cavar fundo num canal cheio
     # de shorts. Evita loop caro/infinito em canais com historico enorme.
@@ -170,6 +211,40 @@ class DemoDiscovery:
                 category_id="27", default_audio_language="pt",
             ))
         return out
+
+    def estatisticas_canal(self, channel_id: str) -> dict:
+        rng = random.Random(channel_id)
+        return {
+            "nome": f"Canal Demo {channel_id[-4:]}",
+            "subscriber_count": rng.randint(10_000, 5_000_000),
+            "total_view_count": rng.randint(1_000_000, 500_000_000),
+            "video_count": rng.randint(100, 5_000),
+        }
+
+    _POOL_COMENTARIOS = [
+        "vamos time, essa temporada e nossa",
+        "que jogo incrivel, torcendo muito pro campeonato",
+        "melhor time do brasil, sem duvida",
+        "final emocionante, ansioso pro proximo campeonato",
+        "esse elenco ta jogando muito esse ano",
+        "torcida sempre junto, bora pra cima",
+        "video top, adoro o conteudo do canal",
+        "que virada de jogo, nao acreditei",
+        "precisa melhorar a estrategia no proximo mapa",
+        "orgulho desse time, representando muito bem",
+        "kkkkk esse video ficou muito engracado",
+        "quero ver mais bastidor assim",
+        "gg, joga muito esse time",
+    ]
+
+    def comentarios_video(self, video_id: str, max_results: int = 100) -> list[dict]:
+        rng = random.Random(video_id)
+        n = rng.randint(5, min(max_results, 20))
+        return [{
+            "comentario_id": f"demo_{video_id}_{i}",
+            "texto": rng.choice(self._POOL_COMENTARIOS),
+            "like_count": rng.randint(0, 500),
+        } for i in range(n)]
 
 
 def get_discovery(modo_demo: bool):

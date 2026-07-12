@@ -1,12 +1,19 @@
 # Dependências do projeto final. Mesma base do projeto_modelo + Streamlit para o dashboard.
-pandas>=2.0
+#
+# pandas<3.0 e pyarrow<18.0: pandas 3.0.3 + pyarrow 25.0.0 tem um SEGFAULT real
+# na conversao pandas->Arrow usada pelo st.bar_chart/st.dataframe (reproduzido
+# e confirmado com faulthandler). Sem teto de versao, um "pip install" novo
+# pega essas versoes quebradas de novo. Testado e funcionando: pandas 2.3.3 +
+# pyarrow 17.0.0.
+pandas>=2.0,<3.0
 polars>=1.0
 duckdb>=1.0
 pandera>=0.20
-pyarrow>=15.0
+pyarrow>=15.0,<18.0
 youtube-transcript-api>=1.0
 google-api-python-client>=2.0
 APScheduler>=3.10
 PyYAML>=6.0
 python-dotenv>=1.0
 streamlit>=1.30
+altair>=5.0   # usado direto em app/paginas/por_time.py (nao so via streamlit)

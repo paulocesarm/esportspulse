@@ -12,3 +12,6 @@ datalake/
 
 # Sistema
 .DS_Store
+
+# Workspace pessoal do editor (caminhos locais da maquina, nao do projeto)
+*.code-workspace

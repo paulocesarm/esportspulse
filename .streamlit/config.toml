@@ -1,0 +1,8 @@
+# Tema fixado em escuro por padrao (decisao de visual do projeto). Logo de
+# marca solida preta (FURIA/MIBR/paiN) que sumiria em cima do escuro usa uma
+# variante com card claro assado na propria imagem (ver app/common.py:ORGS,
+# "*_chip.png") em vez de depender do tema pra ficar visivel. Quem preferir
+# claro ainda pode trocar manualmente no menu do app -- a paleta clara/escura
+# em app/common.py continua cobrindo os dois casos.
+[theme]
+base = "dark"

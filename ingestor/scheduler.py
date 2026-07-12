@@ -12,6 +12,7 @@ Para rodar como servico na VPS, ver deploy/ingestor.service (systemd).
 """
 from __future__ import annotations
 import sys
+import time
 import logging
 from pathlib import Path
 
@@ -40,11 +41,25 @@ def carregar_config() -> dict:
         return yaml.safe_load(f)
 
 
+# Pausa entre CANAIS (nao so entre videos do mesmo canal, ja tratado em
+# pipeline.py) no --once: sem isso, o ultimo video de um canal e o primeiro
+# do proximo saem colados, e os 5 canais juntos viram uma rajada continua
+# contra o mesmo IP -- justamente o cenario que leva a IpBlocked.
+_PAUSA_ENTRE_CANAIS_SEG = 30
+
+
 def rodar_uma_vez(cfg: dict, store: StateStore):
     glob = cfg.get("global", {})
+    modo_demo = glob.get("modo_demo", True)
+    primeiro = True
     for canal in cfg["canais"]:
-        if canal.get("ativo", True):
-            rodar_ciclo(canal, glob, store)
+        if not canal.get("ativo", True):
+            continue
+        if not primeiro and not modo_demo:
+            log.info("pausa de %ds antes do proximo canal", _PAUSA_ENTRE_CANAIS_SEG)
+            time.sleep(_PAUSA_ENTRE_CANAIS_SEG)
+        primeiro = False
+        rodar_ciclo(canal, glob, store)
 
 
 def main():

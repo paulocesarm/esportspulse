@@ -3,11 +3,18 @@
 #
 # IDs verificados via resolver_handle.py em 2026-07-09.
 #
-# DIFERENCA em relacao ao modelo didatico:
-#   Nao ha campo "vocabulario" aqui. Os termos analiticos estao em
-#   sinais.yaml e sao compartilhados por todos os canais — o objetivo
-#   eh detectar eventos (clutch, virada, polemica...) que se aplicam
-#   igualmente a qualquer ORG de esports.
+# DOMINIO UNICO ("esports"): cada canal aqui e uma ORGANIZACAO institucional
+# (FURIA/LOUD/paiN...), nao um jogo. Uma mesma org publica sobre varias
+# modalidades (CS2, Valorant, LoL, Free Fire...) no mesmo canal — por isso
+# nao ha mais campo "game" fixo por canal. O jogo de cada VIDEO e descoberto
+# a partir da propria transcricao (ver ingestor/pipeline.py:_detectar_jogo
+# e o dict "jogos" em config/sinais.yaml), nao do cadastro do canal.
+#
+# Nao ha campo "vocabulario" aqui. Os termos analiticos estao em
+# sinais.yaml e sao compartilhados por todos os canais — o objetivo
+# eh detectar tipo de conteudo (jogo vs. entretenimento), resultado
+# comentado (vitoria/derrota) e modalidade (jogo_detectado) que se
+# aplicam igualmente a qualquer ORG de esports.
 #
 # Como descobrir um novo channel_id:
 #   python -m ingestor.scripts.resolver_handle @handle
@@ -17,46 +24,49 @@ canais:
 
   - nome: "FURIA eSports"
     channel_id: "UCT1F3iuRk0j7owMzNC09q1w"   # @FURIAgg
-    dominio: "cs2"
-    game: "cs2"
+    dominio: "esports"
     duracao_min_seg: 300        # ignora shorts e clips (< 5 min)
-    intervalo_min: 60
-    max_videos_por_ciclo: 5
+    # 1x/dia (1440 min) -- os canais postam ~1-2 video/dia, rodar de hora em
+    # hora so gastava cota sem achar video novo na maioria dos ciclos.
+    intervalo_min: 1440
+    # Teto de videos por ciclo, SEMPRE (carga inicial e ciclos seguintes) —
+    # reduzido de 25 pra 10 (2026-07): rajada menor de transcricao (menos
+    # chance de IpBlocked) e volume comparavel entre times nessa primeira
+    # carga (comparar 20 video da FURIA com 2 do LOUD enviesava a analise).
+    max_videos_por_ciclo: 10
     ativo: true
 
   - nome: "LOUD"
     channel_id: "UC7iwNp4GUynlGXvK-6KD0Rw"   # @loudgg
-    dominio: "valorant"
-    game: "valorant"
+    dominio: "esports"
     duracao_min_seg: 300
-    intervalo_min: 60
-    max_videos_por_ciclo: 5
+    intervalo_min: 1440
+    max_videos_por_ciclo: 10
     ativo: true
 
   - nome: "paiN Gaming"
     channel_id: "UC0jnW-v_1IanHuj2y3Z1AGA"   # @paingamingbr
-    dominio: "lol"
-    game: "lol"
+    dominio: "esports"
     duracao_min_seg: 300
-    intervalo_min: 60
-    max_videos_por_ciclo: 5
+    intervalo_min: 1440
+    max_videos_por_ciclo: 10
     ativo: true
 
-  # - nome: "MIBR"
-  #   channel_id: "UCE30pLfsQQWijIN0RYFoESA"   # @mibr
-  #   dominio: "cs2"
-  #   game: "cs2"
-  #   intervalo_min: 30
-  #   max_videos_por_ciclo: 6
-  #   ativo: false
+  - nome: "MIBR"
+    channel_id: "UCE30pLfsQQWijIN0RYFoESA"   # @mibr
+    dominio: "esports"
+    duracao_min_seg: 300
+    intervalo_min: 1440
+    max_videos_por_ciclo: 10
+    ativo: true
 
-  # - nome: "Fluxo"
-  #   channel_id: "UCUSKHWPgQl1ixaal1vysMyw"   # @Fluxo_Esports
-  #   dominio: "freefire"
-  #   game: "freefire"
-  #   intervalo_min: 60
-  #   max_videos_por_ciclo: 6
-  #   ativo: false
+  - nome: "Fluxo"
+    channel_id: "UCUSKHWPgQl1ixaal1vysMyw"   # @Fluxo_Esports
+    dominio: "esports"
+    duracao_min_seg: 300
+    intervalo_min: 1440
+    max_videos_por_ciclo: 10
+    ativo: true
 
 
 # Parametros globais
@@ -65,10 +75,10 @@ global:
   # Modo demo: gera dados sinteticos deterministicos com termos de esports.
   # Permite rodar e apresentar o pipeline sem API key e sem gastar cota.
   modo_demo: false
-  # Incremental: janela usada nos ciclos seguintes (apos watermark estabelecido).
-  janela_descoberta_dias: 90
-  # Pausa entre chamadas de transcricao (youtube_transcript_api), em segundos.
-  # Evita rajada de requisicoes que leva a IpBlocked — sobretudo relevante em
-  # rede compartilhada (ex.: laboratorio/sala de aula com varios alunos no
-  # mesmo IP publico batendo na mesma API ao mesmo tempo).
-  transcript_delay_seg: 2
+  # Janela de descoberta, usada em TODO ciclo (inicial e incremental). 365
+  # (2026-07, subiu de 90): canal que posta pouco pode nao ter 10 videos de
+  # duracao minima nos ultimos 90 dias -- aumentar a janela e' barato (so
+  # mais paginacao no playlistItems.list, 1 unidade/pagina, nem toca a API
+  # de transcricao) e nao aumenta a rajada real (o teto de max_videos_por_
+  # ciclo continua igual, so escolhe os 10 de um historico maior).
+  janela_descoberta_dias: 365

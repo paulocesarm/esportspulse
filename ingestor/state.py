@@ -13,7 +13,7 @@ from __future__ import annotations
 import sqlite3
 import hashlib
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DDL = """
@@ -40,10 +40,29 @@ CREATE TABLE IF NOT EXISTS ingestion_state (
 );
 
 CREATE TABLE IF NOT EXISTS channel_watermark (
+    channel_id             TEXT PRIMARY KEY,
+    last_published_at      TEXT,             -- maior publishedAt ja processado
+    last_run_at            TEXT,
+    videos_total           INTEGER DEFAULT 0,
+    -- Handler de IpBlocked (rate limit do youtube_transcript_api): enquanto
+    -- "agora" < blocked_until, o ciclo desse canal e' pulado inteiro (nem
+    -- tenta) -- backoff exponencial cresce a cada bloqueio SEGUIDO
+    -- (bloqueios_consecutivos), e zera assim que um video ingere com sucesso.
+    blocked_until          TEXT,
+    bloqueios_consecutivos INTEGER DEFAULT 0
+);
+
+-- Estatisticas do CANAL (nao do video) -- inscritos etc, pra analise cross-org.
+-- Publico via YouTube Data API (channels.list part=statistics), nao exige
+-- OAuth do dono do canal (diferente de audience retention/watch time).
+CREATE TABLE IF NOT EXISTS channel_stats (
     channel_id          TEXT PRIMARY KEY,
-    last_published_at   TEXT,             -- maior publishedAt ja processado
-    last_run_at         TEXT,
-    videos_total        INTEGER DEFAULT 0
+    dominio             TEXT NOT NULL,
+    nome                TEXT,
+    subscriber_count    INTEGER DEFAULT 0,
+    total_view_count    INTEGER DEFAULT 0,
+    video_count         INTEGER DEFAULT 0,
+    updated_at          TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_state_channel ON ingestion_state(channel_id);
@@ -65,6 +84,20 @@ class StateStore:
         self.db_path = db_path
         with self._conn() as c:
             c.executescript(DDL)
+            self._migrar_colunas_cooldown(c)
+
+    def _migrar_colunas_cooldown(self, c) -> None:
+        # banco criado antes do handler de IpBlocked nao tem essas colunas --
+        # CREATE TABLE IF NOT EXISTS nao adiciona coluna em tabela existente.
+        for coluna, ddl in (
+            ("blocked_until", "ALTER TABLE channel_watermark ADD COLUMN blocked_until TEXT"),
+            ("bloqueios_consecutivos",
+             "ALTER TABLE channel_watermark ADD COLUMN bloqueios_consecutivos INTEGER DEFAULT 0"),
+        ):
+            try:
+                c.execute(ddl)
+            except sqlite3.OperationalError:
+                pass   # coluna ja existe
 
     @contextmanager
     def _conn(self):
@@ -97,6 +130,54 @@ class StateStore:
                     last_run_at       = excluded.last_run_at,
                     videos_total      = channel_watermark.videos_total + excluded.videos_total
             """, (channel_id, published_at or "", _now(), novos))
+
+    # --- HANDLER de IpBlocked: cooldown persistido por canal --------------
+    def get_cooldown(self, channel_id: str) -> str | None:
+        """Timestamp ISO ate quando o canal deve ficar 'de castigo', ou None
+        se nao ha cooldown ativo (ou ja passou). Quem chama pula o ciclo
+        inteiro desse canal enquanto isso -- nao adianta tentar de novo
+        contra um IP que o YouTube ja bloqueou."""
+        with self._conn() as c:
+            row = c.execute(
+                "SELECT blocked_until FROM channel_watermark WHERE channel_id=?",
+                (channel_id,)).fetchone()
+        if not row or not row["blocked_until"]:
+            return None
+        return row["blocked_until"] if row["blocked_until"] > _now() else None
+
+    def registrar_bloqueio(self, channel_id: str, cooldown_base_seg: int,
+                          cooldown_max_seg: int) -> str:
+        """Backoff exponencial: cooldown_base * 2^(bloqueios consecutivos ja
+        registrados), com teto em cooldown_max. Cresce a cada bloqueio
+        SEGUIDO (sem nenhum sucesso no meio) -- ver limpar_bloqueio."""
+        with self._conn() as c:
+            row = c.execute(
+                "SELECT bloqueios_consecutivos FROM channel_watermark WHERE channel_id=?",
+                (channel_id,)).fetchone()
+            n = (row["bloqueios_consecutivos"] or 0) if row else 0
+            cooldown_seg = min(cooldown_base_seg * (2 ** n), cooldown_max_seg)
+            ate = (datetime.now(timezone.utc) + timedelta(seconds=cooldown_seg)).isoformat()
+            c.execute("""
+                INSERT INTO channel_watermark
+                    (channel_id, blocked_until, bloqueios_consecutivos, last_run_at)
+                VALUES (?, ?, 1, ?)
+                ON CONFLICT(channel_id) DO UPDATE SET
+                    blocked_until          = excluded.blocked_until,
+                    bloqueios_consecutivos = channel_watermark.bloqueios_consecutivos + 1,
+                    last_run_at            = excluded.last_run_at
+            """, (channel_id, ate, _now()))
+        return ate
+
+    def limpar_bloqueio(self, channel_id: str) -> None:
+        """Zera o contador assim que um video desse canal ingere com sucesso
+        -- o proximo bloqueio (se houver) volta a comecar do cooldown base,
+        em vez de continuar crescendo a partir do teto acumulado."""
+        with self._conn() as c:
+            c.execute("""
+                UPDATE channel_watermark
+                SET bloqueios_consecutivos = 0, blocked_until = NULL
+                WHERE channel_id=?
+            """, (channel_id,))
 
     # --- IDEMPOTENCIA: já processei este video? --------------------------
     def ja_ingerido(self, video_id: str, novo_hash: str | None = None) -> bool:
@@ -142,16 +223,61 @@ class StateStore:
                 WHERE video_id=?
             """, (str(erro)[:300], video_id))
 
+    def videos_falhados(self, channel_id: str) -> list[dict]:
+        """Backlog de video FAILED de um canal -- ja conhecemos o video_id,
+        entao a re-tentativa nao depende de descobrir() (watermark/API de
+        playlist) de novo. Existe pra corrigir um bug real: se algum video
+        MAIS NOVO ja tiver sido ingerido com sucesso ANTES da falha (ordem
+        de processamento e' sempre do mais novo pro mais antigo), o
+        watermark avanca legitimamente ate esse sucesso e qualquer FAILED
+        mais antigo que ele fica pra sempre fora do alcance de descobrir()
+        -- mesmo a idempotencia normal (retry de FAILED) nunca mais
+        acontecendo pra esses videos. Ver ingestor/pipeline.py:rodar_ciclo."""
+        with self._conn() as c:
+            rows = c.execute("""
+                SELECT video_id, channel_id, published_at, title, view_count,
+                       like_count, comment_count, category_id
+                FROM ingestion_state
+                WHERE channel_id=? AND status='FAILED'
+                ORDER BY published_at DESC
+            """, (channel_id,)).fetchall()
+            return [dict(r) for r in rows]
+
     # --- Metadados p/ cruzar Gold (categoria de conteudo) x audiencia -----
     def metadados_video(self, dominio: str) -> list[dict]:
         """video_id + metricas de audiencia + categoria do YouTube, pra o
         Gold cruzar com a classificacao de conteudo (resultado x engajamento)."""
         with self._conn() as c:
             rows = c.execute("""
-                SELECT video_id, title, published_at, view_count, like_count,
-                       comment_count, category_id
+                SELECT video_id, channel_id, title, published_at, view_count,
+                       like_count, comment_count, category_id
                 FROM ingestion_state WHERE dominio=?
             """, (dominio,)).fetchall()
+            return [dict(r) for r in rows]
+
+    # --- Estatisticas de canal (analise CROSS entre organizacoes) ---------
+    def atualizar_stats_canal(self, channel_id, dominio, nome,
+                              subscriber_count, total_view_count,
+                              video_count) -> None:
+        with self._conn() as c:
+            c.execute("""
+                INSERT INTO channel_stats
+                    (channel_id, dominio, nome, subscriber_count,
+                     total_view_count, video_count, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(channel_id) DO UPDATE SET
+                    nome              = excluded.nome,
+                    subscriber_count  = excluded.subscriber_count,
+                    total_view_count  = excluded.total_view_count,
+                    video_count       = excluded.video_count,
+                    updated_at        = excluded.updated_at
+            """, (channel_id, dominio, nome, subscriber_count,
+                  total_view_count, video_count, _now()))
+
+    def stats_canais(self) -> list[dict]:
+        """Estatisticas de todos os canais -- base da analise cross-org."""
+        with self._conn() as c:
+            rows = c.execute("SELECT * FROM channel_stats").fetchall()
             return [dict(r) for r in rows]
 
     # --- Observabilidade --------------------------------------------------

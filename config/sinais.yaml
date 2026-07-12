@@ -1,17 +1,35 @@
 # =============================================================================
-# Sinais de RESULTADO DE JOGO em fala casual — nao jargao de narracao/transmissao.
+# Sinais compartilhados entre os canais de esports (FURIA/LOUD/paiN).
 #
-# Os canais das orgs (FURIA/LOUD/paiN) sao majoritariamente VLOGS de bastidor/
-# dia a dia: jogadores conversando sobre aleatoriedades, se preparando,
-# brincando, e SO EM UM PONTO ESPECIFICO (ou as vezes nem isso) comentam o
-# resultado da partida. Por isso o vocabulario aqui e sobre como alguem
-# comentaria o RESULTADO casualmente ("ganhamos", "perdemos"), nao termos de
-# transmissao ao vivo ("clutch", "ace", "virada" — ninguem fala isso
-# conversando, so o narrador durante o jogo).
+# Descoberta real (com dado de verdade, nao mais chute): os 3 canais tem tipos
+# de conteudo BEM diferentes — FURIA (cs2) e vlog de bastidor de torneio real;
+# paiN (lol) e comentario/analise de gameplay de um criador; LOUD (valorant) e
+# entretenimento generico (desafios, casas assombradas) sem nenhuma relacao
+# com o jogo. Palavras de resultado soltas ("perdeu", "derrota") geram falso
+# positivo em desafio pessoal / brincadeira que nao tem nada a ver com a
+# partida real (ex.: "voce perdeu" numa mansao assombrada).
 #
-# Usado por pipeline._carregar_sinais() como fallback quando o canal, em
-# canais.yaml, nao define um "vocabulario" proprio.
+# Por isso a classificacao agora e em DOIS NIVEIS:
+#   1. contexto_jogo: o video sequer fala do JOGO/partida/torneio? Se nenhuma
+#      dessas palavras aparecer, o video e "entretenimento" e a
+#      classificacao de resultado nem e aplicada (evita o falso positivo).
+#   2. resultado_positivo/negativo: SO dentro de video que ja tem contexto de
+#      jogo, decide se o resultado comentado foi vitoria ou derrota.
 # =============================================================================
+
+# So termos INEQUIVOCOS de torneio/partida de esports -- nada generico o
+# suficiente pra aparecer em vlog de entretenimento/desafio sem relacao com
+# o jogo. Testado com dado real: "jogo", "final", "mapa", "rodada" davam
+# falso positivo (ex.: "no final das contas", "jogo reseta" numa brincadeira
+# dentro de um vlog de casa assombrada, nada a ver com a partida real).
+contexto_jogo:
+  - partida
+  - campeonato
+  - torneio
+  - playoffs
+  - classificacao
+  - adversario
+  - major
 
 resultado_positivo:
   - ganhamos
@@ -30,3 +48,59 @@ resultado_negativo:
   - eliminados
   - eliminado
   - eliminacao
+
+# =============================================================================
+# Deteccao de JOGO por VIDEO (nao por canal!). Uma organizacao (FURIA, MIBR...)
+# tem varias modalidades (CS2, Valorant, LoL, Free Fire, R6...) — o canal
+# institucional posta sobre todas. Por isso "dominio" no canais.yaml e so o
+# identificador do canal ("esports"), e o jogo de cada video e descoberto
+# aqui, procurando por frases/termos no texto completo da transcricao
+# (nao token a token, porque tem frase composta tipo "league of legends").
+# =============================================================================
+jogos:
+  cs2:
+    - "cs2"
+    - "cs 2"
+    - "csgo"
+    - "counter strike"
+    - "counter-strike"
+    - "counterstrike"
+  valorant:
+    - "valorant"
+  lol:
+    - "league of legends"
+    - " lol "
+  freefire:
+    - "free fire"
+    - "freefire"
+  r6:
+    - "rainbow six"
+    - " r6 "
+
+# =============================================================================
+# Elenco (nomes de jogador) por canal+jogo -- sinal ADICIONAL de deteccao de
+# modalidade, somado aos termos de "jogos" acima em _detectar_jogo. Cobre o
+# video que fala de time/jogada citando o jogador, sem nunca falar o nome do
+# jogo/franquia explicitamente (comum em video de bastidor/highlight).
+#
+# Nomes em minusculo/sem acento (mesma normalizacao usada na deteccao). Fonte:
+# Liquipedia / VLR.gg / HLTV, consultado em 2026-07-11. ATENCAO: elenco muda
+# com frequencia (sobretudo o de LoL, que teve 3 trocas so no 1o semestre de
+# 2026) -- revisar periodicamente, nao tratar como definitivo.
+# =============================================================================
+elencos:
+  UCT1F3iuRk0j7owMzNC09q1w:   # FURIA eSports (CS2)
+    cs2: ["fallen", "yuurih", "yekindar", "kscerato", "molodoy"]
+
+  UCE30pLfsQQWijIN0RYFoESA:   # MIBR (CS2)
+    cs2: ["lnz", "insani", "brnz4n", "venomzera", "kl1m", "bit", "nicks", "zews"]
+
+  UC0jnW-v_1IanHuj2y3Z1AGA:   # paiN Gaming (LoL)
+    lol: ["tinowns", "robo", "kuri", "cariok", "trigger", "keine", "boal", "samkz"]
+
+  UCUSKHWPgQl1ixaal1vysMyw:   # Fluxo (CS2 + Free Fire)
+    cs2: ["exit", "dav1deus", "zevy", "kye", "ltz"]
+    freefire: ["proxx7", "buton", "bops", "giuh", "luuuking"]
+
+  UC7iwNp4GUynlGXvK-6KD0Rw:   # LOUD (Valorant)
+    valorant: ["lukxo", "darker", "virtyy", "erde", "cauanzin", "pancada"]
