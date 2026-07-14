@@ -85,8 +85,7 @@ def main():
             rodar_ciclo, IntervalTrigger(minutes=intervalo),
             args=[canal, glob, store],
             id=canal["channel_id"], name=canal["nome"],
-            max_instances=1, coalesce=True,    # nao acumula execucoes atrasadas
-            next_run_time=None)                # primeira corrida no 1o intervalo
+            max_instances=1, coalesce=True)    # nao acumula execucoes atrasadas
         log.info("agendado: %s a cada %d min", canal["nome"], intervalo)
 
     log.info("Ingestor perene iniciado. Ctrl+C para encerrar.")
