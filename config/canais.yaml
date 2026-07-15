@@ -31,10 +31,12 @@ canais:
     # docs/RUNBOOK.md). Reverter pra 1440 (1x/dia) depois da observacao.
     intervalo_min: 480
     # Teto de videos por ciclo, SEMPRE (carga inicial e ciclos seguintes) —
-    # reduzido de 25 pra 10 (2026-07): rajada menor de transcricao (menos
-    # chance de IpBlocked) e volume comparavel entre times nessa primeira
-    # carga (comparar 20 video da FURIA com 2 do LOUD enviesava a analise).
-    max_videos_por_ciclo: 10
+    # reduzido de 25 pra 10 (2026-07) e depois pra 3 (2026-07, observacao de
+    # bloqueio de IP): rajada ainda menor de transcricao (o backlog de FAILED
+    # retenta todo ciclo, entao um teto baixo evita empilhar tentativas) e
+    # volume comparavel entre times nessa primeira carga (comparar 20 video
+    # da FURIA com 2 do LOUD enviesava a analise).
+    max_videos_por_ciclo: 3
     ativo: true
 
   - nome: "LOUD"
@@ -42,7 +44,7 @@ canais:
     dominio: "esports"
     duracao_min_seg: 300
     intervalo_min: 480
-    max_videos_por_ciclo: 10
+    max_videos_por_ciclo: 3
     ativo: true
 
   - nome: "paiN Gaming"
@@ -50,7 +52,7 @@ canais:
     dominio: "esports"
     duracao_min_seg: 300
     intervalo_min: 480
-    max_videos_por_ciclo: 10
+    max_videos_por_ciclo: 3
     ativo: true
 
   - nome: "MIBR"
@@ -58,7 +60,7 @@ canais:
     dominio: "esports"
     duracao_min_seg: 300
     intervalo_min: 480
-    max_videos_por_ciclo: 10
+    max_videos_por_ciclo: 3
     ativo: true
 
   - nome: "Fluxo"
@@ -66,7 +68,7 @@ canais:
     dominio: "esports"
     duracao_min_seg: 300
     intervalo_min: 480
-    max_videos_por_ciclo: 10
+    max_videos_por_ciclo: 3
     ativo: true
 
 
