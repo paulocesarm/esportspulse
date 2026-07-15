@@ -26,9 +26,10 @@ canais:
     channel_id: "UCT1F3iuRk0j7owMzNC09q1w"   # @FURIAgg
     dominio: "esports"
     duracao_min_seg: 300        # ignora shorts e clips (< 5 min)
-    # 1x/dia (1440 min) -- os canais postam ~1-2 video/dia, rodar de hora em
-    # hora so gastava cota sem achar video novo na maioria dos ciclos.
-    intervalo_min: 1440
+    # 3x/dia (480 min = 8h) -- temporario, pra observar em quais janelas do
+    # dia a VPS consegue captar transcricao sem tomar bloqueio de IP (ver
+    # docs/RUNBOOK.md). Reverter pra 1440 (1x/dia) depois da observacao.
+    intervalo_min: 480
     # Teto de videos por ciclo, SEMPRE (carga inicial e ciclos seguintes) —
     # reduzido de 25 pra 10 (2026-07): rajada menor de transcricao (menos
     # chance de IpBlocked) e volume comparavel entre times nessa primeira
@@ -40,7 +41,7 @@ canais:
     channel_id: "UC7iwNp4GUynlGXvK-6KD0Rw"   # @loudgg
     dominio: "esports"
     duracao_min_seg: 300
-    intervalo_min: 1440
+    intervalo_min: 480
     max_videos_por_ciclo: 10
     ativo: true
 
@@ -48,7 +49,7 @@ canais:
     channel_id: "UC0jnW-v_1IanHuj2y3Z1AGA"   # @paingamingbr
     dominio: "esports"
     duracao_min_seg: 300
-    intervalo_min: 1440
+    intervalo_min: 480
     max_videos_por_ciclo: 10
     ativo: true
 
@@ -56,7 +57,7 @@ canais:
     channel_id: "UCE30pLfsQQWijIN0RYFoESA"   # @mibr
     dominio: "esports"
     duracao_min_seg: 300
-    intervalo_min: 1440
+    intervalo_min: 480
     max_videos_por_ciclo: 10
     ativo: true
 
@@ -64,7 +65,7 @@ canais:
     channel_id: "UCUSKHWPgQl1ixaal1vysMyw"   # @Fluxo_Esports
     dominio: "esports"
     duracao_min_seg: 300
-    intervalo_min: 1440
+    intervalo_min: 480
     max_videos_por_ciclo: 10
     ativo: true
 
